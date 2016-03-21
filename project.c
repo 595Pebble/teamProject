@@ -4,17 +4,21 @@ http://www.prasannatech.net/2008/07/socket-programming-tutorial.html
 and
 http://www.binarii.com/files/papers/c_sockets.txt
  */
-#include <windows.h>
 #include <sys/types.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <string.h>
+//#include <termios.h>
+#include <unistd.h>
+#include <string.h>
+#include <pthread.h>
+
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <unistd.h>
-#include <errno.h>
-#include <string.h>
-#include <pthread.h>
 
 char* t;
 
@@ -120,83 +124,58 @@ void* start_server(void* pn)
 
 void* readTemperature()
 {
-    DCB dcb;
-    HANDLE hCom;
-    BOOL fSuccess;
-    char *pcCommPort = "COM5";
-
-    hCom = CreateFile( pcCommPort,
-                       GENERIC_READ | GENERIC_WRITE,
-                       0,    // must be opened with exclusive-access
-                       NULL, // no security attributes
-                       OPEN_EXISTING, // must use OPEN_EXISTING
-                       0,    // not overlapped I/O
-                       NULL  // hTemplate must be NULL for comm devices
-                     );
-
-    if (hCom == INVALID_HANDLE_VALUE)
-    {
-        // Handle the error.
-        printf ("CreateFile failed with error %d.\n", GetLastError());
-        exit(1);
-    }
-
-    // Build on the current configuration, and skip setting the size
-    // of the input and output buffers with SetupComm.
-    fSuccess = GetCommState(hCom, &dcb);
-
-    if (!fSuccess)
-    {
-        // Handle the error.
-        printf ("GetCommState failed with error %d.\n", GetLastError());
-        exit(1);
-    }
-
-    // Fill in DCB: 57,600 bps, 8 data bits, no parity, and 1 stop bit.
-
-    dcb.BaudRate = CBR_9600;     // set the baud rate
-    dcb.ByteSize = 8;             // data size, xmit, and rcv
-    dcb.Parity = NOPARITY;        // no parity bit
-    dcb.StopBits = ONESTOPBIT;    // one stop bit
-
-    fSuccess = SetCommState(hCom, &dcb);
-
-    if (!fSuccess)
-    {
-        // Handle the error.
-        printf ("SetCommState failed with error %d.\n", GetLastError());
-        exit(1);
-    }
-
-    printf ("Serial port %s successfully reconfigured.\n", pcCommPort);
-
-
-    char buf[100];
-    char* token;
-    ReadFile(hCom, buf, 100, NULL, NULL);
-
-    while(1)
-    {
-        token = strtok(buf,"\n");
-        token = strtok(NULL," ");
-        token = strtok(NULL," ");
-        token = strtok(NULL," ");
-        token = strtok(NULL," ");
-        //printf("%s C\n", token);
-        pthread_mutex_lock(&lock);
-        free(t);
-        t=malloc(sizeof(char)*(strlen(token)+1));
-        strcpy(t,token);
-        pthread_mutex_unlock(&lock);
-        ReadFile(hCom, buf, 100, NULL, NULL);
-    }
-
     /*
-    	4. Last step
-    */
-    //close(hCom);
+		1. Open the file
+	*/
+	int fd = open("/dev/ttyACM0", O_RDWR);
+	if (fd == -1)
+		printf("unsuccessfully opened the usb port\n");
 
-    pthread_exit(NULL);
+	/*
+		2. Configure fd for USB
+	*/
+	struct termios options; // struct to hold options
+	tcgetattr(fd, &options); // associate with this fd
+	cfsetispeed(&options, 9600); // set input baud rate
+	cfsetospeed(&options, 9600); // set output baud rate
+	tcsetattr(fd, TCSANOW, &options); // set options
+
+	/*
+		3. Read & Print
+	*/
+	char buf[100];
+	int bytes_read = read(fd, buf, 100);
+    	char tem[100];
+    	strcpy(tem,buf);
+
+	/* make sure the output of arduino is updated (removing "the temperature is" and "\n"), so that no strtoke is used here*/
+	while(1){
+		if(tem[strlen(tem) - 1] == '\n') {
+
+		pthread_mutex_lock(&lock);
+        	free(t);
+        	t=malloc(sizeof(char)*(strlen(tem)+1));
+        	strcpy(t,tem);
+		//printf("t is %s\n", t);
+        	pthread_mutex_unlock(&lock);
+
+                memset(buf,0,sizeof(buf));
+                memset(tem,0,sizeof(tem));
+		}
+		else{
+			strcat(tem, buf);
+			memset(buf,0,sizeof(buf));
+		}
+
+		bytes_read = read(fd, buf, 100);
+	}
+
+	/*
+		4. Last step
+	*/
+	close(fd);
+
+    	pthread_exit(NULL);
 }
 
 
@@ -213,7 +192,7 @@ int main(int argc, char *argv[])
 
     int PORT_NUMBER = atoi(argv[1]);
 
-    pthread_t t2;
+   pthread_t t2;
     int ret_val;
     ret_val=pthread_create(&t2, NULL, &readTemperature, NULL);
     if(ret_val!=0)
@@ -229,6 +208,6 @@ int main(int argc, char *argv[])
         printf("thread is not successfully created.\n");
         exit (1);
     }
-    pthread_join(t1, NULL);
+   pthread_join(t1, NULL);
 }
 
