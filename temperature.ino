@@ -118,17 +118,35 @@ void loop()
   }
 
   int flag=0;
+  int increment = 0;
+  char msg;
+  String s;
+  
  
   while (1)
   {
-    int msg = Serial.read();
-    if(char(msg) == 'f') flag=1;
-    if(char(msg) == 'c') flag=0;
-    if(char(msg) == 'f'||flag==1)
+    Wire.requestFrom(THERM, 2);
+    
+    if (Serial.available() > 0) {
+      msg = Serial.read();
+      if(msg == 'f') flag=1;
+      if(msg == 'c') flag=0;
+      if(msg == '-'){
+        s = Serial.readString();
+        increment= increment - (s.toInt());
+      }
+      if(msg == '+'){
+        s = Serial.readString();
+        increment= increment + (s.toInt());
+      }
+    }
+
+    Temperature_H = Wire.read() + increment;
+    Temperature_L = Wire.read() + increment;
+
+       
+    if(msg == 'f'||flag==1)
     {
-        Wire.requestFrom(THERM, 2);
-        Temperature_H = Wire.read();
-        Temperature_L = Wire.read();
         Cal_temp_f (Decimal, Temperature_H, Temperature_L, IsPositive);
         SerialMonitorPrint_f (Temperature_H, Decimal, IsPositive);
         UpdateRGB_f (Temperature_H);
@@ -136,11 +154,8 @@ void loop()
         delay (1000);        /* Take temperature read every 1 second */
     }
 
-    else if(char(msg) == 'c'||flag==0)
+    else if(msg == 'c'||flag==0)
     {
-        Wire.requestFrom(THERM, 2);
-        Temperature_H = Wire.read();
-        Temperature_L = Wire.read();
         Cal_temp (Decimal, Temperature_H, Temperature_L, IsPositive);
         SerialMonitorPrint (Temperature_H, Decimal, IsPositive);
         UpdateRGB (Temperature_H);
@@ -401,7 +416,6 @@ void UpdateRGB_f (byte Temperature_H)
 ****************************************************************************/
 void SerialMonitorPrint (byte Temperature_H, int Decimal, bool IsPositive)
 {
-    Serial.print("The temperature is ");
     if (!IsPositive)
     {
       Serial.print("-");
@@ -409,13 +423,12 @@ void SerialMonitorPrint (byte Temperature_H, int Decimal, bool IsPositive)
     Serial.print(Temperature_H, DEC);
     Serial.print(".");
     Serial.print(Decimal, DEC);
-    Serial.print(" degree C");
-    Serial.print("\n\n");
+    Serial.print(" C");
+    Serial.print("\n");
 }
 
 void SerialMonitorPrint_f (byte Temperature_H, int Decimal, bool IsPositive)
 {
-    Serial.print("The temperature is ");
     if (!IsPositive)
     {
       Serial.print("-");
@@ -423,8 +436,8 @@ void SerialMonitorPrint_f (byte Temperature_H, int Decimal, bool IsPositive)
     Serial.print(Temperature_H, DEC);
     Serial.print(".");
     Serial.print(Decimal, DEC);
-    Serial.print(" degree F");
-    Serial.print("\n\n");
+    Serial.print(" F");
+    Serial.print("\n");
 }
 
 
