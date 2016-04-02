@@ -5,22 +5,27 @@ and
 http://www.binarii.com/files/papers/c_sockets.txt
  */
 #include <sys/types.h>
-#include <errno.h>
-#include <fcntl.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <signal.h>
-#include <string.h>
-//#include <termios.h>
-#include <unistd.h>
-#include <string.h>
-#include <pthread.h>
-
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <string.h>
+
+#include <fcntl.h>
+#include <signal.h>
+#include <termios.h>
+#include <pthread.h>
+
 
 char* t;
+int cORf = 0;
+double historyT[3600];
+int countT=0;
+int over1hour=0;
+
 
 pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
 
@@ -88,7 +93,65 @@ void* start_server(void* pn)
         printf("Here comes the message:\n");
         printf("%s\n", request);
 
+        cORf++;
 
+        int i;
+        double max=-100.0;
+        double min=100.0;
+        double avg=0.0;
+        double sum=0.0;
+        pthread_mutex_lock(&lock);
+        if(over1hour==0)
+        {
+            for(i=0; i<countT; i++)
+            {
+                if(historyT[i]>max)
+                {
+                    max=historyT[i];
+                }
+                if(historyT[i]<min)
+                {
+                    min=historyT[i];
+                }
+                sum+=historyT[i];
+                avg=sum/countT;
+            }
+            printf("max is %f\n",max);
+            printf("min is %f\n",min);
+            printf("avg is %f\n",avg);
+        }
+        else
+        {
+            for(i=countT; i<3600; i++)
+            {
+                if(historyT[i]>max)
+                {
+                    max=historyT[i];
+                }
+                if(historyT[i]<min)
+                {
+                    min=historyT[i];
+                }
+                sum+=historyT[i];
+            }
+            for(i=0; i<countT; i++)
+            {
+                if(historyT[i]>max)
+                {
+                    max=historyT[i];
+                }
+                if(historyT[i]<min)
+                {
+                    min=historyT[i];
+                }
+                sum+=historyT[i];
+            }
+            avg=sum/3600;
+            printf("max is %f\n",max);
+            printf("min is %f\n",min);
+            printf("avg is %f\n",avg);
+        }
+        pthread_mutex_unlock(&lock);
 
         // this is the message that we'll send back
         /* it actually looks like this:
@@ -98,10 +161,9 @@ void* start_server(void* pn)
         */
         //char *reply = "{\n\"name\": \"cit595\"\n}\n";
         pthread_mutex_lock(&lock);
-        char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"")+strlen(t)+strlen(" C")+strlen("\"\n}\n")+1));
+        char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"")+strlen(t)+strlen("\"\n}\n")+1));
         strcpy(reply,"{\n\"name\": \"");
         strcat(reply,t);
-        strcat(reply," C");
         strcat(reply,"\"\n}\n");
         printf("%s\n",reply);
         pthread_mutex_unlock(&lock);
@@ -125,57 +187,120 @@ void* start_server(void* pn)
 void* readTemperature()
 {
     /*
-		1. Open the file
-	*/
-	int fd = open("/dev/ttyACM0", O_RDWR);
-	if (fd == -1)
-		printf("unsuccessfully opened the usb port\n");
+    	1. Open the file
+    */
+    int fd = open("/dev/ttyACM0", O_RDWR);//88888888888888888888888888888888888888888888888888888888888888888888888
+    if (fd == -1)
+        printf("unsuccessfully opened the usb port\n");
 
-	/*
-		2. Configure fd for USB
-	*/
-	struct termios options; // struct to hold options
-	tcgetattr(fd, &options); // associate with this fd
-	cfsetispeed(&options, 9600); // set input baud rate
-	cfsetospeed(&options, 9600); // set output baud rate
-	tcsetattr(fd, TCSANOW, &options); // set options
+    /*
+    	2. Configure fd for USB
+    */
+    struct termios options; // struct to hold options
+    tcgetattr(fd, &options); // associate with this fd
+    cfsetispeed(&options, 9600); // set input baud rate
+    cfsetospeed(&options, 9600); // set output baud rate
+    tcsetattr(fd, TCSANOW, &options); // set options
 
-	/*
-		3. Read & Print
-	*/
-	char buf[100];
-	int bytes_read = read(fd, buf, 100);
-    	char tem[100];
-    	strcpy(tem,buf);
+    /*
+    	3. Read & Print
+    */
+    char buf[100];
+    int bytes_read = read(fd, buf, 100);
+    char tem[100];
+    char tem2[100];
+    strcpy(tem,buf);
 
-	/* make sure the output of arduino is updated (removing "the temperature is" and "\n"), so that no strtoke is used here*/
-	while(1){
-		if(tem[strlen(tem) - 1] == '\n') {
 
-		pthread_mutex_lock(&lock);
-        	free(t);
-        	t=malloc(sizeof(char)*(strlen(tem)+1));
-        	strcpy(t,tem);
-		//printf("t is %s\n", t);
-        	pthread_mutex_unlock(&lock);
 
-                memset(buf,0,sizeof(buf));
-                memset(tem,0,sizeof(tem));
-		}
-		else{
-			strcat(tem, buf);
-			memset(buf,0,sizeof(buf));
-		}
+    char* c = "c";
+    char* f = "f";
+    char* C = "C";
+    char* F = "F";
+    int localcORf=0;
 
-		bytes_read = read(fd, buf, 100);
-	}
+    char* token;
+    double tempT;
+    int stableCount = 0;
 
-	/*
-		4. Last step
-	*/
-	close(fd);
 
-    	pthread_exit(NULL);
+    /* make sure the output of arduino is updated (removing "the temperature is" and "\n"), so that no strtoke is used here*/
+    while(1)
+    {
+
+        if(localcORf!=cORf)
+        {
+            if(cORf%2==0)
+            {
+                write(fd,c,strlen(c)+1);
+                printf("c is sent to urduino\n");
+            }
+            else
+            {
+                write(fd,f,strlen(f)+1);
+                printf("f is sent to urduino\n");
+            }
+            localcORf=cORf;
+        }
+
+        if(tem[strlen(tem) - 1] == '\n')
+        {
+
+            // add temperature into historyT array
+            strcpy(tem2, tem);
+            token = strtok(tem2, " \n");
+            tempT = atof(token);
+            //printf("tempT is %f\n", tempT);
+            token = strtok(NULL, " \n");
+            //printf("token is--%s--\n", token);
+
+            //put temperature recodes into the array and count the number of records
+            if(strcmp(token,F)==0)
+            {
+                tempT=(tempT-32)*(5.0/9.0);
+            }
+
+            // the first temperature is always unstable and it will casue problems for calculating max and min,
+            //the first five records will be discarded.
+            if(stableCount>5)
+            {
+                pthread_mutex_lock(&lock);
+                historyT[countT]=tempT;
+                countT++;
+                if(countT==3600)
+                {
+                    over1hour=1;
+                }
+                countT=countT%3600;
+                pthread_mutex_unlock(&lock);
+            }
+            stableCount++;
+
+            pthread_mutex_lock(&lock);
+            free(t);
+            t=malloc(sizeof(char)*(strlen(tem)+1));
+            strcpy(t,tem);
+            printf("t is %s\n", t);
+            pthread_mutex_unlock(&lock);
+
+            memset(buf,0,sizeof(buf));
+            memset(tem,0,sizeof(tem));
+        }
+        else
+        {
+            strcat(tem, buf);
+            memset(buf,0,sizeof(buf));
+        }
+
+        bytes_read = read(fd, buf, 100);
+    }
+
+    /*
+    	4. Last step
+    */
+    close(fd);
+
+    pthread_exit(NULL);
 }
 
 
@@ -192,7 +317,7 @@ int main(int argc, char *argv[])
 
     int PORT_NUMBER = atoi(argv[1]);
 
-   pthread_t t2;
+    pthread_t t2;
     int ret_val;
     ret_val=pthread_create(&t2, NULL, &readTemperature, NULL);
     if(ret_val!=0)
@@ -208,6 +333,6 @@ int main(int argc, char *argv[])
         printf("thread is not successfully created.\n");
         exit (1);
     }
-   pthread_join(t1, NULL);
+    pthread_join(t1, NULL);
 }
 
