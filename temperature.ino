@@ -118,6 +118,7 @@ void loop()
   }
 
   int flag=0;
+  int sleep=0;
   int increment = 0;
   char msg;
   String s;
@@ -129,16 +130,15 @@ void loop()
     
     if (Serial.available() > 0) {
       msg = Serial.read();
-      if(msg == 'f') flag=1;
-      if(msg == 'c') flag=0;
-      if(msg == '-'){
-        s = Serial.readString();
-        increment= increment - (s.toInt());
+      if(msg == 'w') sleep=0;
+      else if(msg == 's'||sleep==1) {
+        sleep=1;
+        continue;
       }
-      if(msg == '+'){
-        s = Serial.readString();
-        increment= increment + (s.toInt());
-      }
+      else if(msg == 'f') flag=1;
+      else if(msg == 'c') flag=0;
+      else if(msg == '-') increment--;
+      else if(msg == '+') increment++;
     }
 
     Temperature_H = Wire.read() + increment;
