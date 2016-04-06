@@ -25,6 +25,10 @@ int cORf = 0;
 double historyT[3600];
 int countT=0;
 int over1hour=0;
+int up = 0;
+int down = 0;
+int standby = 0;
+
 
 
 pthread_mutex_t lock=PTHREAD_MUTEX_INITIALIZER;
@@ -93,7 +97,7 @@ void* start_server(void* pn)
         printf("Here comes the message:\n");
         printf("%s\n", request);
 
-        cORf++;
+
 
         int i;
         double max=-100.0;
@@ -151,8 +155,119 @@ void* start_server(void* pn)
             printf("min is %f\n",min);
             printf("avg is %f\n",avg);
         }
+
+
+
         pthread_mutex_unlock(&lock);
 
+        //sending temperature to user
+        char* token;
+        char* request2 = (char*)malloc(sizeof(char)*(strlen(request)+1));
+        strcpy(request2, request);
+        token = strtok(request2, " ");
+        token = strtok(NULL, " ");
+        if(strcmp(token, "/temperature")==0)
+        {
+            pthread_mutex_lock(&lock);
+            char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"") + strlen(t)+strlen("\"\n}\n")+1));
+            strcpy(reply,"{\n\"name\": \"");
+            strcat(reply,t);
+            strcat(reply,"\"\n}\n");
+            printf("current replay is %s\n",reply);
+            pthread_mutex_unlock(&lock);
+            send(fd, reply, strlen(reply), 0);
+            free(reply);
+        }
+        else if(strcmp(token,"/F/C")==0){
+            cORf++;
+            char* outmsg = "Unit changed";
+            char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"") + strlen(outmsg) +strlen("\"\n}\n")+1));
+            strcpy(reply,"{\n\"name\": \"");
+            strcat(reply,outmsg);
+            strcat(reply,"\"\n}\n");
+            printf("high replay is %s\n",reply);
+            send(fd, reply, strlen(reply), 0);
+            free(reply);
+        }
+        else if(strcmp(token,"/standby")==0){
+            pthread_mutex_lock(&lock);
+            standby++;
+            pthread_mutex_unlock(&lock);
+        }
+        else if(strcmp(token,"/+")==0){
+            pthread_mutex_lock(&lock);
+            up++;
+            pthread_mutex_unlock(&lock);
+        }
+        else if(strcmp(token,"/-")==0){
+            pthread_mutex_lock(&lock);
+            down++;
+            pthread_mutex_unlock(&lock);
+        }
+
+        else if(strcmp(token,"/high")==0){
+            char buff[50];
+            sprintf(buff,"%.2f", max);
+            char* outmsg = malloc(sizeof(char)*(strlen(buff)+1));
+            strcpy(outmsg,buff);
+            char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"")+ strlen("max: ") + strlen(outmsg) + strlen(" C")+strlen("\"\n}\n")+1));
+            strcpy(reply,"{\n\"name\": \"");
+            strcat(reply, "max: ");
+            strcat(reply,outmsg);
+            strcat(reply, " C");
+            strcat(reply,"\"\n}\n");
+            printf("high replay is %s\n",reply);
+            send(fd, reply, strlen(reply), 0);
+            free(reply);
+            free(outmsg);
+        }
+
+        else if(strcmp(token,"/low")==0){
+            char buff[50];
+            sprintf(buff,"%.2f", min);
+            char* outmsg = malloc(sizeof(char)*(strlen(buff)+1));
+            strcpy(outmsg,buff);
+            char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"")+ strlen("min: ") + strlen(outmsg) + strlen(" C")+strlen("\"\n}\n")+1));
+            strcpy(reply,"{\n\"name\": \"");
+            strcat(reply, "min: ");
+            strcat(reply,outmsg);
+            strcat(reply, " C");
+            strcat(reply,"\"\n}\n");
+            printf("low replay is %s\n",reply);
+            send(fd, reply, strlen(reply), 0);
+            free(reply);
+            free(outmsg);
+        }
+
+        else if(strcmp(token,"/average")==0){
+            char buff[50];
+            sprintf(buff,"%.2f", avg);
+            char* outmsg = malloc(sizeof(char)*(strlen(buff)+1));
+            strcpy(outmsg,buff);
+            char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"")+ strlen("avg: ") + strlen(outmsg) + strlen(" C")+strlen("\"\n}\n")+1));
+            strcpy(reply,"{\n\"name\": \"");
+            strcat(reply, "avg: ");
+            strcat(reply,outmsg);
+            strcat(reply, " C");
+            strcat(reply,"\"\n}\n");
+            printf("avg replay is %s\n",reply);
+            send(fd, reply, strlen(reply), 0);
+            free(reply);
+            free(outmsg);
+        }
+/*
+        else if(strcmp(token,"/min")==0){
+            pthread_mutex_lock(&lock);
+            reqmin++;
+            pthread_mutex_unlock(&lock);
+        }
+
+        else if(strcmp(token,"/avg")==0){
+            pthread_mutex_lock(&lock);
+            reqavg++;
+            pthread_mutex_unlock(&lock);
+        }
+*/
         // this is the message that we'll send back
         /* it actually looks like this:
           {
@@ -160,22 +275,17 @@ void* start_server(void* pn)
           }
         */
         //char *reply = "{\n\"name\": \"cit595\"\n}\n";
-        pthread_mutex_lock(&lock);
-        char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"")+strlen(t)+strlen("\"\n}\n")+1));
-        strcpy(reply,"{\n\"name\": \"");
-        strcat(reply,t);
-        strcat(reply,"\"\n}\n");
-        printf("%s\n",reply);
-        pthread_mutex_unlock(&lock);
+        //printf("%s\n",t);
+
 
 
         // 6. send: send the message over the socket
         // note that the second argument is a char*, and the third is the number of chars
-        send(fd, reply, strlen(reply), 0);
+
         //printf("Server sent message: %s\n", reply);
 
         // 7. close: close the socket connection
-        free(reply);
+
         close(fd);
     }
     close(sock);
@@ -217,6 +327,9 @@ void* readTemperature()
     char* f = "f";
     char* C = "C";
     char* F = "F";
+    char* plus = "+";
+    char* minus = "-";
+    char* s = "s";
     int localcORf=0;
 
     char* token;
@@ -232,16 +345,39 @@ void* readTemperature()
         {
             if(cORf%2==0)
             {
-                write(fd,c,strlen(c)+1);
+                write(fd,c,strlen(c));
                 printf("c is sent to urduino\n");
             }
             else
             {
-                write(fd,f,strlen(f)+1);
+                write(fd,f,strlen(f));
                 printf("f is sent to urduino\n");
             }
             localcORf=cORf;
         }
+
+        if(up!=0){
+        write(fd,plus,strlen(plus));
+        pthread_mutex_lock(&lock);
+        up=0;
+        pthread_mutex_unlock(&lock);
+        }
+
+        if(down!=0){
+        write(fd,minus,strlen(minus));
+        pthread_mutex_lock(&lock);
+        down=0;
+        pthread_mutex_unlock(&lock);
+        }
+
+        if(standby!=0){
+        write(fd,s,strlen(s));
+        printf("s is sent to arduino\n");
+        pthread_mutex_lock(&lock);
+        standby=0;
+        pthread_mutex_unlock(&lock);
+        }
+
 
         if(tem[strlen(tem) - 1] == '\n')
         {
@@ -278,6 +414,7 @@ void* readTemperature()
 
             pthread_mutex_lock(&lock);
             free(t);
+            tem[strlen(tem) - 1] = '\0';
             t=malloc(sizeof(char)*(strlen(tem)+1));
             strcpy(t,tem);
             printf("t is %s\n", t);
