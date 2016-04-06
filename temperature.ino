@@ -145,7 +145,7 @@ void loop()
     Temperature_L = Wire.read() + increment;
 
        
-    if(msg == 'f'||flag==1)
+    if(sleep==0 && (msg == 'f'||flag==1))
     {
         Cal_temp_f (Decimal, Temperature_H, Temperature_L, IsPositive);
         SerialMonitorPrint_f (Temperature_H, Decimal, IsPositive);
@@ -154,7 +154,7 @@ void loop()
         delay (1000);        /* Take temperature read every 1 second */
     }
 
-    else if(msg == 'c'||flag==0)
+    else if(sleep==0 && (msg == 'c'||flag==0))
     {
         Cal_temp (Decimal, Temperature_H, Temperature_L, IsPositive);
         SerialMonitorPrint (Temperature_H, Decimal, IsPositive);
