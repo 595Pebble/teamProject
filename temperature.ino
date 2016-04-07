@@ -145,21 +145,28 @@ void loop()
     Temperature_L = Wire.read() + increment;
 
        
-    if(sleep==0 && (msg == 'f'||flag==1))
+    if (msg == 'f'||flag==1)
     {
         Cal_temp_f (Decimal, Temperature_H, Temperature_L, IsPositive);
         SerialMonitorPrint_f (Temperature_H, Decimal, IsPositive);
-        UpdateRGB_f (Temperature_H);
-        Dis_7SEG_f (Decimal, Temperature_H, Temperature_L, IsPositive);
-        delay (1000);        /* Take temperature read every 1 second */
+        if(sleep==0){
+          UpdateRGB_f (Temperature_H);
+          Dis_7SEG_f (Decimal, Temperature_H, Temperature_L, IsPositive);
+          delay (1000);        /* Take temperature read every 1 second */
+        }
+        else Clear();
+        delay (1000);        
     }
 
-    else if(sleep==0 && (msg == 'c'||flag==0))
+    else if (msg == 'c'||flag==0)
     {
         Cal_temp (Decimal, Temperature_H, Temperature_L, IsPositive);
         SerialMonitorPrint (Temperature_H, Decimal, IsPositive);
-        UpdateRGB (Temperature_H);
-        Dis_7SEG (Decimal, Temperature_H, Temperature_L, IsPositive);
+        if(sleep==0){
+          UpdateRGB (Temperature_H);
+          Dis_7SEG (Decimal, Temperature_H, Temperature_L, IsPositive);
+        }
+        else Clear();
         delay (1000);
     }
 
@@ -422,6 +429,7 @@ void SerialMonitorPrint (byte Temperature_H, int Decimal, bool IsPositive)
     }
     Serial.print(Temperature_H, DEC);
     Serial.print(".");
+    if(Decimal<1000)  Serial.print("0");
     Serial.print(Decimal, DEC);
     Serial.print(" C");
     Serial.print("\n");
@@ -435,9 +443,23 @@ void SerialMonitorPrint_f (byte Temperature_H, int Decimal, bool IsPositive)
     }
     Serial.print(Temperature_H, DEC);
     Serial.print(".");
+    if(Decimal<1000)  Serial.print("0");
     Serial.print(Decimal, DEC);
     Serial.print(" F");
     Serial.print("\n");
+}
+
+
+void Clear ()
+{
+  byte Digit = 4;                 /* Number of 7-Segment digit */
+  byte Number;                    /* Temporary variable hold the number to display */
+
+  while(Digit>0){
+    Send7SEG (Digit,0x00);     /* Display on the 7-Segment */
+    Digit--;
+  }/* Subtract 1 digit */    
+  
 }
 
 
