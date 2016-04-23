@@ -152,10 +152,9 @@ void loop()
         if(sleep==0){
           UpdateRGB_f (Temperature_H);
           Dis_7SEG_f (Decimal, Temperature_H, Temperature_L, IsPositive);
-          delay (500);        /* Take temperature read every 1 second */
         }
         else Clear();
-        delay (500);        
+        delay (1000);        
     }
 
     else if (msg == 'c'||flag==0)
@@ -165,10 +164,9 @@ void loop()
         if(sleep==0){
           UpdateRGB (Temperature_H);
           Dis_7SEG (Decimal, Temperature_H, Temperature_L, IsPositive);
-          delay (500);
         }
         else Clear();
-        delay (500);
+        delay (1000);
     }
 
 
