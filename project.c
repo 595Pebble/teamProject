@@ -1,9 +1,4 @@
-/*
-This code primarily comes from
-http://www.prasannatech.net/2008/07/socket-programming-tutorial.html
-and
-http://www.binarii.com/files/papers/c_sockets.txt
- */
+
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -30,7 +25,7 @@ int up = 0;
 int down = 0;
 int standby = 0;
 int wake = 0;
-int unitMode=0; // 0 means unit in C and 1 means unit in F
+int unitMode=0;
 int disconSensor = 0;
 
 
@@ -112,7 +107,6 @@ void* start_server(void* pn)
             send(fd, reply, strlen(reply), 0);
             printf("disconnect replay is %s\n",reply);
             free(reply);
-            free(msg);
             close(fd);
             continue;
         }
@@ -139,9 +133,6 @@ void* start_server(void* pn)
                 sum+=historyT[i];
                 avg=sum/countT;
             }
-            printf("max is %f\n",max);
-            printf("min is %f\n",min);
-            printf("avg is %f\n",avg);
         }
         else
         {
@@ -170,9 +161,6 @@ void* start_server(void* pn)
                 sum+=historyT[i];
             }
             avg=sum/3600;
-            printf("max is %f\n",max);
-            printf("min is %f\n",min);
-            printf("avg is %f\n",avg);
         }
 
 
@@ -214,24 +202,56 @@ void* start_server(void* pn)
             pthread_mutex_lock(&lock);
             standby++;
             pthread_mutex_unlock(&lock);
+            char* outmsg = "Standing by!";
+            char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"") + strlen(outmsg) +strlen("\"\n}\n")+1));
+            strcpy(reply,"{\n\"name\": \"");
+            strcat(reply,outmsg);
+            strcat(reply,"\"\n}\n");
+            printf("high replay is %s\n",reply);
+            send(fd, reply, strlen(reply), 0);
+            free(reply);
         }
-        else if(strcmp(token,"/wake")==0)
+        else if(strcmp(token,"/wakeup")==0)
         {
             pthread_mutex_lock(&lock);
             wake++;
             pthread_mutex_unlock(&lock);
+            char* outmsg = "Waked up!";
+            char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"") + strlen(outmsg) +strlen("\"\n}\n")+1));
+            strcpy(reply,"{\n\"name\": \"");
+            strcat(reply,outmsg);
+            strcat(reply,"\"\n}\n");
+            printf("high replay is %s\n",reply);
+            send(fd, reply, strlen(reply), 0);
+            free(reply);
         }
-        else if(strcmp(token,"/inc")==0)
+        else if(strcmp(token,"/+")==0)
         {
             pthread_mutex_lock(&lock);
             up++;
             pthread_mutex_unlock(&lock);
+            char* outmsg = "Calibrated!";
+            char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"") + strlen(outmsg) +strlen("\"\n}\n")+1));
+            strcpy(reply,"{\n\"name\": \"");
+            strcat(reply,outmsg);
+            strcat(reply,"\"\n}\n");
+            printf("high replay is %s\n",reply);
+            send(fd, reply, strlen(reply), 0);
+            free(reply);
         }
-        else if(strcmp(token,"/dec")==0)
+        else if(strcmp(token,"/-")==0)
         {
             pthread_mutex_lock(&lock);
             down++;
             pthread_mutex_unlock(&lock);
+            char* outmsg = "Calibrated!";
+            char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"") + strlen(outmsg) +strlen("\"\n}\n")+1));
+            strcpy(reply,"{\n\"name\": \"");
+            strcat(reply,outmsg);
+            strcat(reply,"\"\n}\n");
+            printf("high replay is %s\n",reply);
+            send(fd, reply, strlen(reply), 0);
+            free(reply);
         }
 
         else if(strcmp(token,"/high")==0)
@@ -324,7 +344,7 @@ void* start_server(void* pn)
             free(outmsg);
         }
 
-        else if(strcmp(token,"/history")==0)
+        else if(strcmp(token,"/tempHistory")==0)
         {
             int i;
             pthread_mutex_lock(&lock);
@@ -339,7 +359,6 @@ void* start_server(void* pn)
             sprintf(buff, "%.2f", MMM);
             buff[strlen(buff)]='\0';
             char* reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"") + 12*(strlen(buff) + strlen(",")) + strlen("\"\n}\n") + 1));
-            //char *reply = malloc(sizeof(char)*(strlen("{\n\"name\": \"")+ strlen("avg: ") + strlen(outmsg) + strlen(" C")+strlen("\"\n}\n")+1));
             strcpy(reply,"{\n\"name\": \"");
             strcat(reply,buff);
             strcat(reply,",");
@@ -359,29 +378,6 @@ void* start_server(void* pn)
             send(fd, reply, strlen(reply), 0);
             free(reply);
         }
-        /*
-                else if(strcmp(token,"/min")==0){
-                    pthread_mutex_lock(&lock);
-                    reqmin++;
-                    pthread_mutex_unlock(&lock);
-                }
-
-                else if(strcmp(token,"/avg")==0){
-                    pthread_mutex_lock(&lock);
-                    reqavg++;
-                    pthread_mutex_unlock(&lock);
-                }
-        */
-        // this is the message that we'll send back
-        /* it actually looks like this:
-          {
-             "name": "cit595"
-          }
-        */
-        //char *reply = "{\n\"name\": \"cit595\"\n}\n";
-        //printf("%s\n",t);
-
-
 
         // 6. send: send the message over the socket
         // note that the second argument is a char*, and the third is the number of chars
@@ -452,7 +448,6 @@ void* readTemperature()
         if(currentTime-readTime>=3)
         {
             disconSensor=1;
-            //printf("disconnecting to sensor.\n");
         }
         else
         {
@@ -517,9 +512,7 @@ void* readTemperature()
             strcpy(tem2, tem);
             token = strtok(tem2, " \n");
             tempT = atof(token);
-            //printf("tempT is %f\n", tempT);
             token = strtok(NULL, " \n");
-            //printf("token is--%s--\n", token);
 
             //put temperature recodes into the array and count the number of records
             if(strcmp(token,F)==0)
