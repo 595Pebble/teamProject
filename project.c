@@ -96,6 +96,7 @@ void* start_server(void* pn)
         printf("Here comes the message:\n");
         printf("%s\n", request);
 
+        // 6. send: send the message over the socket
         if(disconSensor==1)
         {
             char *msg = "Sensor Disconnected!";
@@ -111,7 +112,7 @@ void* start_server(void* pn)
             continue;
         }
 
-
+        // calculate the max, min, and average temperature
         int i;
         double max=-100.0;
         double min=100.0;
@@ -163,16 +164,15 @@ void* start_server(void* pn)
             avg=sum/3600;
         }
 
-
-
         pthread_mutex_unlock(&lock);
 
-        //sending temperature to user
+
         char* token;
         char* request2 = (char*)malloc(sizeof(char)*(strlen(request)+1));
         strcpy(request2, request);
         token = strtok(request2, " ");
         token = strtok(NULL, " ");
+        // send current temperature to user
         if(strcmp(token, "/temperature")==0)
         {
             pthread_mutex_lock(&lock);
@@ -185,6 +185,7 @@ void* start_server(void* pn)
             send(fd, reply, strlen(reply), 0);
             free(reply);
         }
+        // change the flag for unit and send response to user
         else if(strcmp(token,"/F/C")==0)
         {
             cORf++;
@@ -197,6 +198,8 @@ void* start_server(void* pn)
             send(fd, reply, strlen(reply), 0);
             free(reply);
         }
+
+        // change the flag for stand by mode and send response to user
         else if(strcmp(token,"/standby")==0)
         {
             pthread_mutex_lock(&lock);
@@ -211,6 +214,7 @@ void* start_server(void* pn)
             send(fd, reply, strlen(reply), 0);
             free(reply);
         }
+        // change the flag for waking up and send response to user
         else if(strcmp(token,"/wakeup")==0)
         {
             pthread_mutex_lock(&lock);
@@ -225,6 +229,7 @@ void* start_server(void* pn)
             send(fd, reply, strlen(reply), 0);
             free(reply);
         }
+        // change the flag for calibration and send response to user
         else if(strcmp(token,"/+")==0)
         {
             pthread_mutex_lock(&lock);
@@ -239,6 +244,7 @@ void* start_server(void* pn)
             send(fd, reply, strlen(reply), 0);
             free(reply);
         }
+        // change the flag for calibration and send response to user
         else if(strcmp(token,"/-")==0)
         {
             pthread_mutex_lock(&lock);
@@ -253,7 +259,7 @@ void* start_server(void* pn)
             send(fd, reply, strlen(reply), 0);
             free(reply);
         }
-
+        // send the highest temperature in last hour to user
         else if(strcmp(token,"/high")==0)
         {
             char buff[50];
@@ -283,7 +289,7 @@ void* start_server(void* pn)
             free(reply);
             free(outmsg);
         }
-
+        // send the lowest temperature in last hour to user
         else if(strcmp(token,"/low")==0)
         {
             char buff[50];
@@ -313,7 +319,7 @@ void* start_server(void* pn)
             free(reply);
             free(outmsg);
         }
-
+        // send the average temperature in last hour to user
         else if(strcmp(token,"/average")==0)
         {
             char buff[50];
@@ -343,7 +349,7 @@ void* start_server(void* pn)
             free(reply);
             free(outmsg);
         }
-
+        // send the temperatures in last minute to user
         else if(strcmp(token,"/tempHistory")==0)
         {
             int i;
@@ -379,10 +385,8 @@ void* start_server(void* pn)
             free(reply);
         }
 
-        // 6. send: send the message over the socket
-        // note that the second argument is a char*, and the third is the number of chars
 
-        //printf("Server sent message: %s\n", reply);
+
 
         // 7. close: close the socket connection
 
@@ -399,7 +403,7 @@ void* readTemperature()
     /*
     	1. Open the file
     */
-    int fd = open("/dev/ttyACM0", O_RDWR);//88888888888888888888888888888888888888888888888888888888888888888888888
+    int fd = open("/dev/ttyACM0", O_RDWR);
     if (fd == -1)
         printf("unsuccessfully opened the usb port\n");
 
@@ -421,8 +425,6 @@ void* readTemperature()
     char tem2[100];
     strcpy(tem,buf);
 
-
-
     char* c = "c";
     char* f = "f";
     char* C = "C";
@@ -440,7 +442,7 @@ void* readTemperature()
     time_t currentTime;
 
 
-    /* make sure the output of arduino is updated (removing "the temperature is" and "\n"), so that no strtoke is used here*/
+    // keep recording the received temperature and send corresponding character to sensor for calibration, standby mode, wakeup, and unit change.
     while(1)
     {
         currentTime=time(NULL);
@@ -506,15 +508,12 @@ void* readTemperature()
 
         if(tem[strlen(tem) - 1] == '\n')
         {
-
-            // add temperature into historyT array
             readTime=time(NULL);
             strcpy(tem2, tem);
             token = strtok(tem2, " \n");
             tempT = atof(token);
             token = strtok(NULL, " \n");
 
-            //put temperature recodes into the array and count the number of records
             if(strcmp(token,F)==0)
             {
                 unitMode=1;
@@ -525,7 +524,7 @@ void* readTemperature()
                 unitMode=0;
             }
 
-            // the first temperature is always unstable and it will casue problems for calculating max and min,
+            // the first temperature is always unstable and it will cause problems for calculating max and min,
             //the first five records will be discarded.
             if(stableCount>5)
             {
