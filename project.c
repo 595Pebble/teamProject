@@ -132,8 +132,8 @@ void* start_server(void* pn)
                     min=historyT[i];
                 }
                 sum+=historyT[i];
-                avg=sum/countT;
             }
+            avg=sum/countT;
         }
         else
         {
@@ -389,7 +389,7 @@ void* start_server(void* pn)
 
 
         // 7. close: close the socket connection
-
+        free(request2);
         close(fd);
     }
     close(sock);
