@@ -15,7 +15,6 @@
 #include <pthread.h>
 #include <time.h>
 
-
 char* t;
 int cORf = 0;
 double historyT[3600];
@@ -598,6 +597,19 @@ int main(int argc, char *argv[])
         printf("thread is not successfully created.\n");
         exit (1);
     }
-    pthread_join(t1, NULL);
+
+    char str[100];
+
+    while(1)
+    {
+        scanf("%s", str);
+        char q[]= {'q','\0'};
+        if(strcmp(str,q)==0)
+        {
+            break;
+        }
+
+    }
+
 }
 
